@@ -1,0 +1,116 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+ * Copyright (C) 2024 TheNotOnly <darren.ramen@gmail.com>
+ *
+ */
+
+/dts-v1/;
+#include "msm8916-handsome-openstick-common.dtsi"
+
+/ {
+	model = "OpenStick";
+	compatible = "qcom,msm8916", "openstick,lte";
+
+	battery: battery {
+		compatible = "simple-battery";
+		voltage-min-design-microvolt = <3400000>;
+		voltage-max-design-microvolt = <4200000>;
+		energy-full-design-microwatt-hours = <4000000>;
+		charge-full-design-microamp-hours = <2000000>;
+		precharge-current-microamp = <256000>;
+		charge-term-current-microamp = <128000>;
+		constant-charge-current-max-microamp = <900000>;
+		constant-charge-voltage-max-microvolt = <4400000>;
+	};
+};
+
+&pm8916_bms {
+	compatible = "qcom,pm8916-bms-vm";
+	status = "okay";
+	io-channels = <&pm8916_vadc 0x10>, /* LR_MUX1_BATT_THERM */
+				<&pm8916_vadc 0x07>; /* VSYS */
+	io-channel-names = "batt_therm", "vbat_sns";
+
+	monitored-battery = <&battery>;
+
+	qcom,v-cutoff-uv = <3350000>;
+	qcom,max-voltage-uv = <4200000>;
+	qcom,r-conn-mohm = <65>;
+	qcom,shutdown-soc-valid-limit = <100>;
+	qcom,low-soc-calculate-soc-threshold = <8>;
+	qcom,low-voltage-calculate-soc-ms = <5000>;
+	qcom,low-soc-calculate-soc-ms = <5000>;
+	qcom,calculate-soc-ms = <20000>;
+	qcom,volatge-soc-timeout-ms = <60000>;
+	qcom,low-voltage-threshold = <3450000>;
+	qcom,s3-ocv-tolerence-uv = <1200>;
+	qcom,s2-fifo-length = <5>;
+	qcom,low-soc-fifo-length = <2>;
+	qcom,bms-vadc = <&pm8916_vadc>;
+//	qcom,bms-adc_tm = <&pm8916_adc_tm>;
+//	qcom,pmic-revid = <&pm8916_revid>;
+	qcom,force-s3-on-suspend;
+	qcom,force-s2-in-charging;
+	qcom,report-charger-eoc;
+	qcom,resume-soc = <95>;
+	qcom,use-reported-soc;
+	qcom,force-bms-active-on-charger;
+	qcom,ignore-shutdown-soc;
+};
+
+&pm8916_charger {
+	compatible = "qcom,pm8916-lbc";
+	reg = <0x1000>, <0x1200>, <0x1300>, <0x1600>;
+	interrupts = <0x0 0x13 1 IRQ_TYPE_EDGE_BOTH>;
+	io-channels = <&pm8916_vadc 0x00>, /* USBIN */
+			    <&pm8916_vadc 0x10>; /* BAT_THERM */
+
+	io-channel-names = "usb_in", "bat_therm";
+
+	qcom,vdd-safe = <4200000>;  // 4200mV in microvolts
+	qcom,ibat-safe = <1000000>; // 1000mA in microamps
+
+	monitored-battery = <&battery>;
+
+	status = "okay";
+};
+
+&pm8916_vadc {
+	#address-cells = <1>;
+	#size-cells = <0>;
+	#io-channel-cells = <1>;
+
+	/* Add missing channels */
+	adc-chan@30 {
+		reg = <VADC_LR_MUX1_BATT_THERM>;
+		label = "batt_therm";
+		qcom,decimation = <0>;
+		qcom,pre-div-channel-scaling = <0>;
+		qcom,calibration-type = "ratiometric";
+		qcom,scale-function = <1>;
+		qcom,hw-settle-time = <11>;
+		qcom,fast-avg-setup = <2>;
+	};
+
+	adc-chan@6 {
+		reg = <VADC_LR_MUX6_VBAT_SNS>;
+		label = "vbat_sns";
+		qcom,decimation = <0>;
+		qcom,pre-div-channel-scaling = <1>;
+		qcom,calibration-type = "absolute";
+		qcom,scale-function = <0>;
+		qcom,hw-settle-time = <11>;
+		qcom,fast-avg-setup = <2>;
+	};
+
+	/* Add any other missing properties */
+	qcom,adc-bit-resolution = <15>;
+	qcom,adc-vdd-reference = <1800>;
+};
+
+&pm8916_temp {
+	label = "pm8916_tz";
+	qcom,channel-num = <0x08>;
+	qcom,threshold-set = <0x00>;
+	#thermal-sensor-cells = <0>;
+};
