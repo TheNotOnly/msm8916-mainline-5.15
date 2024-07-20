@@ -259,3 +259,86 @@
 &wcd_codec {
 	status = "disabled";
 };
+
+&soc {
+    gpu: gpu@1c00000 {
+        compatible = "qcom,adreno-306", "qcom,adreno";
+        reg = <0x01c00000 0x20000>;
+        reg-names = "kgsl_3d0_reg_memory";
+        interrupts = <0 33 IRQ_TYPE_LEVEL_HIGH>;
+        interrupt-names = "kgsl_3d0_irq";
+        clock-names =
+            "core",
+            "iface",
+            "mem",
+            "mem_iface";
+        clocks =
+            <&gcc GCC_OXILI_GFX3D_CLK>,
+            <&gcc GCC_OXILI_AHB_CLK>,
+            <&gcc GCC_OXILI_GMEM_CLK>,
+            <&gcc GCC_BIMC_GFX_CLK>;
+        power-domains = <&gcc OXILI_GDSC>;
+        operating-points-v2 = <&gpu_opp_table>;
+        iommus = <&gpu_iommu 0>;
+    };
+
+    backlight: backlight {
+        compatible = "pwm-backlight";
+        pwms = <&pm8916_pwm 0 100000>;
+        brightness-levels = <0 4 8 16 32 64 128 255>;
+        default-brightness-level = <6>;
+        status = "okay";
+        vdd-supply = <&pm8916_l17>;
+        enable-gpios = <&msmgpio 98 GPIO_ACTIVE_HIGH>;
+    };
+
+    spi_0: spi@78b7000 {
+        compatible = "qcom,spi-qup-v2";
+        reg = <0x78b7000 0x600>;
+        interrupts = <0 96 IRQ_TYPE_LEVEL_HIGH>;
+        clocks = <&gcc GCC_BLSP1_QUP3_SPI_APPS_CLK>,
+                 <&gcc GCC_BLSP1_AHB_CLK>;
+        clock-names = "core", "iface";
+        #address-cells = <1>;
+        #size-cells = <0>;
+        status = "okay";
+
+        panel: panel@0 {
+            compatible = "gc,gc9107";
+            reg = <0>;
+            spi-max-frequency = <50000000>;
+            dc-gpios = <&msmgpio 30 GPIO_ACTIVE_HIGH>;
+            reset-gpios = <&msmgpio 11 GPIO_ACTIVE_LOW>;
+            backlight = <&backlight>;
+        };
+    };
+};
+
+&mdss {
+    mdp: mdp@1a01000 {
+        compatible = "qcom,mdp5";
+        reg = <0x1a01000 0x89000>;
+        reg-names = "mdp_phys";
+        interrupts = <0 73 IRQ_TYPE_LEVEL_HIGH>;
+
+        clocks = <&gcc GCC_MDSS_AHB_CLK>,
+                 <&gcc GCC_MDSS_AXI_CLK>,
+                 <&gcc GCC_MDSS_MDP_CLK>,
+                 <&gcc GCC_MDSS_VSYNC_CLK>;
+        clock-names = "iface_clk", "bus_clk", "core_clk", "vsync_clk";
+    };
+};
+
+&dsi0 {
+    status = "disabled";
+};
+
+&pm8916_pwm {
+    status = "okay";
+};
+
+&pm8916_l17 {
+    regulator-min-microvolt = <2850000>;
+    regulator-max-microvolt = <2850000>;
+    status = "okay";
+};
