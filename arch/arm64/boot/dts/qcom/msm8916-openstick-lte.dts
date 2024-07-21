@@ -5,11 +5,12 @@
  */
 
 /dts-v1/;
+#include <dt-bindings/gpio/gpio.h>
 #include "msm8916-handsome-openstick-common.dtsi"
 
 / {
 	model = "OpenStick";
-	compatible = "qcom,msm8916", "openstick,lte";
+	compatible = "qcom,msm8916", "openstick,lte", "qcom,msm8916-cdp";
 
 	battery: battery {
 		compatible = "simple-battery";
@@ -202,6 +203,7 @@
 	io-channel-names = "usb_in", "bat_therm";
 
 	qcom,vdd-safe = <4200000>;  // 4200mV in microvolts
+    qcom,vdd-max = <4300000>;   // 4300mV in microvolts
 	qcom,ibat-safe = <1000000>; // 1000mA in microamps
 
 	monitored-battery = <&battery>;
@@ -262,11 +264,14 @@
 
 &soc {
     gpu: gpu@1c00000 {
-        compatible = "qcom,adreno-306", "qcom,adreno";
+        compatible = "qcom,adreno-306.0", "qcom,adreno";
         reg = <0x01c00000 0x20000>;
         reg-names = "kgsl_3d0_reg_memory";
         interrupts = <0 33 IRQ_TYPE_LEVEL_HIGH>;
         interrupt-names = "kgsl_3d0_irq";
+        qcom,chipid = <0x3000600>;
+        vdd-supply = <&rpmpd MSM8916_VDDCX>;
+        vddcx-supply = <&rpmpd MSM8916_VDDCX>;
         clock-names =
             "core",
             "iface",
@@ -282,16 +287,6 @@
         iommus = <&gpu_iommu 0>;
     };
 
-    backlight: backlight {
-        compatible = "pwm-backlight";
-        pwms = <&pm8916_pwm 0 100000>;
-        brightness-levels = <0 4 8 16 32 64 128 255>;
-        default-brightness-level = <6>;
-        status = "okay";
-        vdd-supply = <&pm8916_l17>;
-        enable-gpios = <&msmgpio 98 GPIO_ACTIVE_HIGH>;
-    };
-
     spi_0: spi@78b7000 {
         compatible = "qcom,spi-qup-v2";
         reg = <0x78b7000 0x600>;
@@ -304,18 +299,30 @@
         status = "okay";
 
         panel: panel@0 {
-            compatible = "gc,gc9107";
+            compatible = "sitronix,st7735r";
             reg = <0>;
             spi-max-frequency = <50000000>;
             dc-gpios = <&msmgpio 30 GPIO_ACTIVE_HIGH>;
             reset-gpios = <&msmgpio 11 GPIO_ACTIVE_LOW>;
-            backlight = <&backlight>;
+            backlight = <&wled>;
+            power-supply = <&pm8916_l17>;
+            width = <128>;
+            height = <128>;
+            buswidth = <8>;
+            rotate = <0>;
+            fps = <30>;
+            rgb;
         };
     };
 };
 
 &mdss {
+    status = "okay";
     mdp: mdp@1a01000 {
+        status = "okay";
+        qcom,max-bandwidth-low-kbps = <1100000>;
+        qcom,max-bandwidth-high-kbps = <1100000>;
+        qcom,max-clk-rate = <320000000>;
         compatible = "qcom,mdp5";
         reg = <0x1a01000 0x89000>;
         reg-names = "mdp_phys";
@@ -333,12 +340,60 @@
     status = "disabled";
 };
 
-&pm8916_pwm {
-    status = "okay";
-};
-
 &pm8916_l17 {
     regulator-min-microvolt = <2850000>;
     regulator-max-microvolt = <2850000>;
     status = "okay";
+};
+
+&pm8916_mpps {
+    #address-cells = <1>;
+    #size-cells = <1>;
+    mpp@a300 {
+        reg = <0xa300 0x100>;
+        qcom,pin-num = <4>;
+        qcom,mode = <1>;        /* Digital output */
+        qcom,output-type = <0>; /* CMOS */
+        qcom,vin-sel = <2>;     /* S4 1.8V */
+        qcom,src-sel = <1>;     /* Special Function 1 = Manual mode */
+        qcom,master-en = <1>;   /* Enable MPP */
+        status = "okay";
+    };
+};
+
+&spmi_bus {
+    #address-cells = <2>;
+    #size-cells = <0>;
+    pm8916@1 {
+        #address-cells = <1>;
+       #size-cells = <1>;
+        wled: wled@a300 {
+            compatible = "qcom,pm8941-wled";
+            label = "backlight";
+            reg = <0xa300 0x100>;
+
+            qcom,cs-out;
+            qcom,cabc;
+            qcom,current-limit = <20>;
+            qcom,current-boost-limit = <805>;
+            qcom,switching-freq = <1600>;
+            qcom,ovp = <29>;
+            qcom,num-strings = <1>;
+            qcom,enabled-strings = <0>;
+
+            status = "okay";
+        };
+    };
+};
+
+
+&gcc {
+    #address-cells = <1>;
+    #size-cells = <1>;
+    oxili_gdsc: gdsc@660d000 {
+        compatible = "qcom,gdsc";
+        regulator-name = "oxili_gdsc";
+        reg = <0x660d000 0x4000>;
+        status = "okay";
+    };
 };
