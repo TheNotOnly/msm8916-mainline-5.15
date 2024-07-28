@@ -124,6 +124,13 @@
 		};
 	};
 
+    power-supply-graph {
+        lbc-to-battery {
+            power-supply = <&pm8916_charger>;
+            power-supply-consumer = <&battery>;
+        };
+    };
+
 	/* Define thermal zones */
 	thermal-zones {
 		pm8916-thermal {
@@ -167,6 +174,7 @@
 	io-channel-names = "batt_therm", "vbat_sns";
 
 	monitored-battery = <&battery>;
+    power-supplies = <&pm8916_charger>;
 
 	qcom,v-cutoff-uv = <3350000>;
 	qcom,max-voltage-uv = <4200000>;
@@ -264,27 +272,9 @@
 
 &soc {
     gpu: gpu@1c00000 {
-        compatible = "qcom,adreno-306.0", "qcom,adreno";
-        reg = <0x01c00000 0x20000>;
-        reg-names = "kgsl_3d0_reg_memory";
-        interrupts = <0 33 IRQ_TYPE_LEVEL_HIGH>;
-        interrupt-names = "kgsl_3d0_irq";
         qcom,chipid = <0x3000600>;
         vdd-supply = <&rpmpd MSM8916_VDDCX>;
         vddcx-supply = <&rpmpd MSM8916_VDDCX>;
-        clock-names =
-            "core",
-            "iface",
-            "mem",
-            "mem_iface";
-        clocks =
-            <&gcc GCC_OXILI_GFX3D_CLK>,
-            <&gcc GCC_OXILI_AHB_CLK>,
-            <&gcc GCC_OXILI_GMEM_CLK>,
-            <&gcc GCC_BIMC_GFX_CLK>;
-        power-domains = <&gcc OXILI_GDSC>;
-        operating-points-v2 = <&gpu_opp_table>;
-        iommus = <&gpu_iommu 0>;
     };
 
     spi_0: spi@78b7000 {
@@ -297,14 +287,14 @@
         #address-cells = <1>;
         #size-cells = <0>;
         status = "okay";
-
-        panel: panel@0 {
+        
+        panel@0 {
             compatible = "sitronix,st7735r";
             reg = <0>;
             spi-max-frequency = <50000000>;
             dc-gpios = <&msmgpio 30 GPIO_ACTIVE_HIGH>;
             reset-gpios = <&msmgpio 11 GPIO_ACTIVE_LOW>;
-            backlight = <&wled>;
+            backlight = <&backlight>;
             power-supply = <&pm8916_l17>;
             width = <128>;
             height = <128>;
@@ -312,38 +302,52 @@
             rotate = <0>;
             fps = <30>;
             rgb;
+
+            ports {
+                #address-cells = <1>;
+                #size-cells = <0>;
+
+                port@0 {
+                    reg = <0>;
+
+                    spi_panel_in: endpoint {
+                        remote-endpoint = <&spi_panel_out>;
+                    };
+                };
+
+                port@1 {
+                    reg = <1>;
+
+                    spi_panel_out: endpoint {
+                        remote-endpoint = <&spi_panel_in>;
+                    };
+                };
+            };
         };
     };
 };
 
 &mdss {
-    status = "okay";
+    status = "disabled";
+    power-domains = <&rpmpd MSM8916_VDDMX>;
+    vdd-supply = <&rpmpd MSM8916_VDDCX>;
+    vddio-supply = <&pm8916_l5>;
+    vdda-supply = <&pm8916_l11>;
+
+    #address-cells = <1>;
+    #size-cells = <1>;
+
     mdp: mdp@1a01000 {
         status = "okay";
         qcom,max-bandwidth-low-kbps = <1100000>;
         qcom,max-bandwidth-high-kbps = <1100000>;
         qcom,max-clk-rate = <320000000>;
-        compatible = "qcom,mdp5";
-        reg = <0x1a01000 0x89000>;
-        reg-names = "mdp_phys";
         interrupts = <0 73 IRQ_TYPE_LEVEL_HIGH>;
-
-        clocks = <&gcc GCC_MDSS_AHB_CLK>,
-                 <&gcc GCC_MDSS_AXI_CLK>,
-                 <&gcc GCC_MDSS_MDP_CLK>,
-                 <&gcc GCC_MDSS_VSYNC_CLK>;
-        clock-names = "iface_clk", "bus_clk", "core_clk", "vsync_clk";
     };
 };
 
 &dsi0 {
     status = "disabled";
-};
-
-&pm8916_l17 {
-    regulator-min-microvolt = <2850000>;
-    regulator-max-microvolt = <2850000>;
-    status = "okay";
 };
 
 &pm8916_mpps {
@@ -364,28 +368,34 @@
 &spmi_bus {
     #address-cells = <2>;
     #size-cells = <0>;
-    pm8916@1 {
+    
+    pmicinternal: pmic@0 {
+        compatible = "qcom,pm8916", "qcom,spmi-pmic";
         #address-cells = <1>;
-       #size-cells = <1>;
-        wled: wled@a300 {
-            compatible = "qcom,pm8941-wled";
-            label = "backlight";
-            reg = <0xa300 0x100>;
+        #size-cells = <0>;
+        reg = <0x0 SPMI_USID>;
 
+        backlight: leds@a300 {
+            compatible = "qcom,pm8941-wled";
+            reg = <0xa300>;
+            label = "backlight";
+            qcom,num-strings = <1>;
+            qcom,enabled-strings = <0>;
             qcom,cs-out;
-            qcom,cabc;
             qcom,current-limit = <20>;
             qcom,current-boost-limit = <805>;
             qcom,switching-freq = <1600>;
             qcom,ovp = <29>;
-            qcom,num-strings = <1>;
-            qcom,enabled-strings = <0>;
+            
+            interrupt-names = "ovp";
 
+            linux,name = "lcd-backlight";
+            linux,default-trigger = "bkl-trigger";
+            
             status = "okay";
         };
     };
 };
-
 
 &gcc {
     #address-cells = <1>;
@@ -396,4 +406,8 @@
         reg = <0x660d000 0x4000>;
         status = "okay";
     };
+};
+
+&backlight {
+    enable-gpios = <&msmgpio 98 GPIO_ACTIVE_HIGH>;
 };
